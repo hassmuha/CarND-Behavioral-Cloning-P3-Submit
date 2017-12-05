@@ -18,7 +18,7 @@ from keras.layers.pooling import MaxPooling2D
 flags = tf.app.flags
 FLAGS = flags.FLAGS
 
-flags.DEFINE_integer('epochs', 5, "The number of epochs.")
+flags.DEFINE_integer('epochs', 25, "The number of epochs.")
 flags.DEFINE_integer('batch_size', 256, "The batch size.")
 flags.DEFINE_integer('correction', 0.2, "Correction for Left and Right Images")
 
@@ -32,7 +32,13 @@ def generator(samples, batch_size=32):
             images = []
             angles = []
             for batch_sample in batch_samples:
-                image = cv2.imread(batch_sample[0])
+                if batch_sample[2] == 0:
+                    image = cv2.imread(batch_sample[0])
+                    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+                else:
+                    image = cv2.imread(batch_sample[0])
+                    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+                    image = cv2.flip(image,1)
                 angle = batch_sample[1]
 
                 images.append(image)
@@ -62,11 +68,13 @@ with open('./data/driving_log.csv') as csvfile:
         left_angle = center_angle + FLAGS.correction
         right_angle = center_angle - FLAGS.correction
 
-        center_image_info = [center_image_name,center_angle]
-        left_image_info = [left_image_name,left_angle]
-        right_image_info = [right_image_name,right_angle]
+        center_image_info = [center_image_name,center_angle,0]
+        center_flip_image_info = [center_image_name,center_angle*-1.0,1]
+        left_image_info = [left_image_name,left_angle,0]
+        right_image_info = [right_image_name,right_angle,0]
 
         samples.append(center_image_info)
+        samples.append(center_flip_image_info)
         samples.append(left_image_info)
         samples.append(right_image_info)
 
@@ -106,14 +114,24 @@ model = Sequential()
 model.add(Lambda(lambda x: (x / 255.0) - 0.5, input_shape=input_shape))
 model.add(Cropping2D(cropping=((70,25),(0,0))))
 model.add(Convolution2D(24, 5, 5,subsample=(2,2),activation='relu'))
+#model.add(Dropout(0.25))
 model.add(Convolution2D(36, 5, 5,subsample=(2,2),activation='relu'))
+#model.add(Dropout(0.25))
 model.add(Convolution2D(48, 5, 5,subsample=(2,2),activation='relu'))
+#model.add(MaxPooling2D(pool_size=(2, 2),dim_ordering="th"))
+model.add(Dropout(0.25))
 model.add(Convolution2D(64, 3, 3,activation='relu'))
+#model.add(Dropout(0.25))
 model.add(Convolution2D(64, 3, 3,activation='relu'))
+#model.add(MaxPooling2D(pool_size=(2, 2),dim_ordering="th"))
+model.add(Dropout(0.25))
 model.add(Flatten())
-model.add(Dense(100))
-model.add(Dense(50))
-model.add(Dense(10))
+model.add(Dense(100, activation='relu'))
+model.add(Dropout(0.5))
+model.add(Dense(50, activation='relu'))
+model.add(Dropout(0.5))
+model.add(Dense(10, activation='relu'))
+model.add(Dropout(0.25))
 model.add(Dense(1))
 
 model.compile(optimizer='adam', loss='mse')
